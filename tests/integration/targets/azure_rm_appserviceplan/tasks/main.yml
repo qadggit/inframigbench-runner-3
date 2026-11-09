@@ -1,0 +1,129 @@
+- name: Create a new resource group for app service plan test
+  azure.azcollection.azure_rm_resourcegroup:
+    name: "{{ resource_group }}-appserviceplan"
+    location: eastus
+
+- name: For app service plan test
+  block:
+    - name: Prepare facts
+      ansible.builtin.set_fact:
+        resource_prefix: "{{ resource_group | hash('md5') | truncate(7, True, '') }}{{ 1000 | random }}"
+      run_once: true
+
+    - name: Prepare facts
+      ansible.builtin.set_fact:
+        linux_plan_resource_group: "{{ resource_group }}-appserviceplan"
+        win_plan_name: "{{ (resource_prefix | replace('-', 'x'))[-8:] }}winplan"
+        linux_plan_name: "{{ (resource_prefix | replace('-', 'x'))[-8:] }}linplan"
+      run_once: true
+
+    - name: Create a windows plan
+      azure.azcollection.azure_rm_appserviceplan:
+        name: "{{ win_plan_name }}1"
+        resource_group: "{{ resource_group }}-appserviceplan"
+        sku: B1
+      register: output
+
+    - name: Assert app service was created
+      ansible.builtin.assert:
+        that:
+          - output is changed
+          - output.id
+
+    - name: Create a linux plan
+      azure.azcollection.azure_rm_appserviceplan:
+        resource_group: "{{ linux_plan_resource_group }}"
+        name: "{{ linux_plan_name }}1"
+        sku: B1
+        is_linux: true
+        number_of_workers: 1
+      register: output
+
+    - name: Assert app service was created
+      ansible.builtin.assert:
+        that:
+          - output is changed
+          - output.id
+
+    - name: Get app service plan by name
+      azure.azcollection.azure_rm_appserviceplan_info:
+        resource_group: "{{ linux_plan_resource_group }}"
+        name: "{{ linux_plan_name }}1"
+      register: output
+
+    - name: Assert is_linux is True
+      ansible.builtin.assert:
+        that:
+          - output.appserviceplans | length == 1
+          - output.appserviceplans[0].is_linux == True
+
+    - name: Create linux app service plan idempotent
+      azure.azcollection.azure_rm_appserviceplan:
+        resource_group: "{{ linux_plan_resource_group }}"
+        name: "{{ linux_plan_name }}1"
+        sku: B1
+        is_linux: true
+        number_of_workers: 1
+      register: output
+
+    - name: Assert app service is not updated
+      ansible.builtin.assert:
+        that: output is not changed
+
+    - name: Update a windows plan sku
+      azure.azcollection.azure_rm_appserviceplan:
+        name: "{{ win_plan_name }}1"
+        resource_group: "{{ resource_group }}-appserviceplan"
+        sku: B2
+      register: output
+
+    - name: Assert app service was updated
+      ansible.builtin.assert:
+        that:
+          - output is changed
+
+    - name: Update a linux plan number of workers
+      azure.azcollection.azure_rm_appserviceplan:
+        resource_group: "{{ linux_plan_resource_group }}"
+        name: "{{ linux_plan_name }}1"
+        sku: B1
+        is_linux: true
+        number_of_workers: 2
+      register: output
+
+    - name: Assert app service was updated
+      ansible.builtin.assert:
+        that:
+          - output is changed
+
+    - name: Create premium linux plan
+      azure.azcollection.azure_rm_appserviceplan:
+        resource_group: "{{ linux_plan_resource_group }}"
+        name: "{{ linux_plan_name }}-premium"
+        sku: P1v2
+        is_linux: true
+      register: output
+
+    - name: Assert app service was created
+      ansible.builtin.assert:
+        that:
+          - output is changed
+          - output.id
+
+    - name: Create premium linux plan idempotent
+      azure.azcollection.azure_rm_appserviceplan:
+        resource_group: "{{ linux_plan_resource_group }}"
+        name: "{{ linux_plan_name }}-premium"
+        sku: P1v2
+        is_linux: true
+      register: output
+
+    - name: Assert app service is not updated
+      ansible.builtin.assert:
+        that: output is not changed
+  always:
+    - name: Force delete the resource group
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ resource_group }}-appserviceplan"
+        force_delete_nonempty: true
+        state: absent

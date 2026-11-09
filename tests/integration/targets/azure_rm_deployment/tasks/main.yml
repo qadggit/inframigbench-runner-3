@@ -1,0 +1,88 @@
+- name: Create a new resource group for deployment test
+  azure.azcollection.azure_rm_resourcegroup:
+    name: "{{ resource_group }}-deployment"
+    location: eastus
+
+- name: For deployment test
+  block:
+    - name: Create random dns label
+      ansible.builtin.set_fact:
+        dns_label: "test{{ resource_group | hash('md5') | truncate(16, True, '') + (65535 | random | string) }}"
+        password: "{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits', 'punctuation'], length=12) }}"
+
+    - name: Error Create Azure Deploy
+      azure.azcollection.azure_rm_deployment:
+        resource_group: "{{ resource_group }}-deployment"
+        location: "eastus"
+        template_link: 'https://raw.githubusercontent.com/Azure/azure-quickstart-templates/d01a5c06f4f1bc03a049ca17bbbd6e06d62657b3/101-vm-simple-linux/azuredeploy.json'
+        deployment_name: "{{ dns_label }}"
+        parameters:
+          adminUsername:
+            value: chouseknecht
+          adminPassword:
+            value: "{{ password }}"
+          dnsLabelPrefix:
+            value: "{{ dns_label }}"
+          ubuntuOSVersion:
+            value: "Never-LTS"
+      register: output
+      ignore_errors: true
+
+    - name: Assert error deploy failed with readable message
+      ansible.builtin.assert:
+        that:
+          - output is failed
+          - output.msg is defined
+          - "'Deployment failed' in output.msg"
+          - "'is not JSON serializable' not in output.msg"
+
+    - name: Create Azure Deploy with template_link
+      azure.azcollection.azure_rm_deployment:
+        resource_group: "{{ resource_group }}-deployment"
+        location: "eastus"
+        template_link: 'https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/quickstarts/microsoft.storage/storage-account-create/azuredeploy.json'
+        deployment_name: "{{ dns_label }}-link"
+        parameters:
+          storageAccountType:
+            value: "Standard_LRS"
+          location:
+            value: "eastus"
+      register: output_link
+
+    - name: Assert template_link deployment succeeded
+      ansible.builtin.assert:
+        that:
+          - output_link is not failed
+          - output_link.deployment is defined
+          - output_link.deployment.name == dns_label + '-link'
+
+    - name: Get Deployment Facts for Resource Group
+      azure.azcollection.azure_rm_deployment_info:
+        resource_group: "{{ resource_group }}-deployment"
+      register: output
+    - name: Print the deployment facts
+      ansible.builtin.debug:
+        var: output
+
+    - name: Get Deployment Facts for named deployment
+      azure.azcollection.azure_rm_deployment_info:
+        resource_group: "{{ resource_group }}-deployment"
+        name: "{{ dns_label }}-link"
+      register: output
+    - name: Print the deployment facts
+      ansible.builtin.debug:
+        var: output
+
+    - name: Assert that values are returned
+      ansible.builtin.assert:
+        that:
+          - output is not changed
+          - output.deployments[0]['provisioning_state'] != None
+          - output.deployments[0]['output_resources'] is defined
+          - output.deployments[0]['outputs'] | length > 0
+  always:
+    - name: Force delete the resource group
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ resource_group }}-deployment"
+        force_delete_nonempty: true
+        state: absent

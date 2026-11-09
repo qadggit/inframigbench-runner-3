@@ -1,0 +1,98 @@
+- name: Create a new resource group for capacity reservation group test
+  azure.azcollection.azure_rm_resourcegroup:
+    name: "{{ resource_group }}-capacityreservationgroup"
+    location: eastus
+
+- name: For capacity reservation grouptest
+  block:
+    - name: Prepare random number
+      ansible.builtin.set_fact:
+        random_postfix: "{{ resource_group | hash('md5') | truncate(10, True, '') }}"
+
+    - name: Create a new capacity reservation group(Checkmode test)
+      azure.azcollection.azure_rm_capacityreservationgroup:
+        resource_group: "{{ resource_group }}-capacityreservationgroup"
+        name: "{{ random_postfix }}"
+        zones:
+          - 1
+          - 2
+        tags:
+          key1: value1
+      check_mode: true
+
+    - name: Create a new capacity reservation group
+      azure.azcollection.azure_rm_capacityreservationgroup:
+        resource_group: "{{ resource_group }}-capacityreservationgroup"
+        name: "{{ random_postfix }}"
+        zones:
+          - 1
+          - 2
+        tags:
+          key1: value1
+      register: output
+
+    - name: Assert the capacity reservation group created
+      ansible.builtin.assert:
+        that:
+          - output is changed
+
+    - name: Update the capacity reservation group's tag
+      azure.azcollection.azure_rm_capacityreservationgroup:
+        resource_group: "{{ resource_group }}-capacityreservationgroup"
+        name: "{{ random_postfix }}"
+        zones:
+          - 1
+          - 2
+        tags:
+          key2: value2
+      register: output
+
+    - name: Assert the capacity reservation group updated
+      ansible.builtin.assert:
+        that:
+          - output is changed
+
+    - name: Recreate the capacity reservation group(idempotent test)
+      azure.azcollection.azure_rm_capacityreservationgroup:
+        resource_group: "{{ resource_group }}-capacityreservationgroup"
+        name: "{{ random_postfix }}"
+        zones:
+          - 1
+          - 2
+        tags:
+          key2: value2
+      register: output
+
+    - name: Assert the capacity reservation group no change
+      ansible.builtin.assert:
+        that:
+          - output is not changed
+
+    - name: Get capacity reservation group by name
+      azure.azcollection.azure_rm_capacityreservationgroup_info:
+        resource_group: "{{ resource_group }}-capacityreservationgroup"
+        name: "{{ random_postfix }}"
+      register: output
+
+    - name: Assert the capacity reservation group no change
+      ansible.builtin.assert:
+        that:
+          - output.capacity_reservation_groups[0].tags | length == 2
+
+    - name: Delete the capacity reservation group
+      azure.azcollection.azure_rm_capacityreservationgroup:
+        resource_group: "{{ resource_group }}-capacityreservationgroup"
+        name: "{{ random_postfix }}"
+        state: absent
+      register: output
+
+    - name: Assert the capacity reservation group deleted
+      ansible.builtin.assert:
+        that:
+          - output is changed
+  always:
+    - name: Force delete the resource group
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ resource_group }}-capacityreservationgroup"
+        force_delete_nonempty: true
+        state: absent

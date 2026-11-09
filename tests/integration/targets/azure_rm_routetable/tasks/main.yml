@@ -1,0 +1,222 @@
+- name: Create a new resource group for route table test
+  azure.azcollection.azure_rm_resourcegroup:
+    name: "{{ resource_group }}-routetable"
+    location: eastus
+
+- name: For route table test
+  block:
+    - name: Prepare random number
+      ansible.builtin.set_fact:
+        name_rpfx: "table{{ resource_group | hash('md5') | truncate(7, True, '') }}{{ 1000 | random }}"
+        route_name: "route{{ resource_group | hash('md5') | truncate(7, True, '') }}{{ 1000 | random }}"
+      run_once: true
+
+    - name: Create a route table (check mode)
+      azure.azcollection.azure_rm_routetable:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-routetable"
+        tags:
+          purpose: testing
+      check_mode: true
+      register: output
+
+    - name: Assert check mode
+      ansible.builtin.assert:
+        that:
+          - output.id is none
+          - output is changed
+
+    - name: Create a route table
+      azure.azcollection.azure_rm_routetable:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-routetable"
+        tags:
+          purpose: testing
+      register: output
+
+    - name: Assert the route table created
+      ansible.builtin.assert:
+        that:
+          - output is changed
+          - output.id is defined
+
+    - name: Create a route table (idempotent)
+      azure.azcollection.azure_rm_routetable:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-routetable"
+        tags:
+          purpose: testing
+      register: output
+
+    - name: Assert idempotent
+      ansible.builtin.assert:
+        that:
+          - output is not changed
+
+    - name: Get facts of the table
+      azure.azcollection.azure_rm_routetable_info:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-routetable"
+      register: output
+
+    - name: Assert the route table facts
+      ansible.builtin.assert:
+        that:
+          - "output.route_tables | length == 1"
+          - "output.route_tables[0].routes | length == 0"
+
+    - name: Create route (check mode)
+      azure.azcollection.azure_rm_route:
+        name: "{{ route_name }}"
+        resource_group: "{{ resource_group }}-routetable"
+        next_hop_type: virtual_network_gateway
+        address_prefix: "10.1.0.0/16"
+        route_table_name: "{{ name_rpfx }}"
+      check_mode: true
+      register: output
+
+    - name: Assert check mode
+      ansible.builtin.assert:
+        that:
+          - output is changed
+          - output.id is none
+
+    - name: Create route
+      azure.azcollection.azure_rm_route:
+        name: "{{ route_name }}"
+        resource_group: "{{ resource_group }}-routetable"
+        next_hop_type: virtual_network_gateway
+        address_prefix: "10.1.0.0/16"
+        route_table_name: "{{ name_rpfx }}"
+      register: output
+
+    - name: Assert the route created
+      ansible.builtin.assert:
+        that:
+          - output is changed
+          - output.id is defined
+
+    - name: Create route (idempotent)
+      azure.azcollection.azure_rm_route:
+        name: "{{ route_name }}"
+        resource_group: "{{ resource_group }}-routetable"
+        next_hop_type: virtual_network_gateway
+        address_prefix: "10.1.0.0/16"
+        route_table_name: "{{ name_rpfx }}"
+      register: output
+
+    - name: Assert idempotent
+      ansible.builtin.assert:
+        that:
+          - output is not changed
+
+    - name: Update route
+      azure.azcollection.azure_rm_route:
+        name: "{{ route_name }}"
+        resource_group: "{{ resource_group }}-routetable"
+        next_hop_type: virtual_network_gateway
+        address_prefix: "10.1.0.0/24"
+        route_table_name: "{{ name_rpfx }}"
+      register: output
+
+    - name: Assert the route updated
+      ansible.builtin.assert:
+        that:
+          - output is changed
+
+    - name: Get facts of the route
+      azure.azcollection.azure_rm_route_info:
+        name: "{{ route_name }}"
+        resource_group: "{{ resource_group }}-routetable"
+        route_table_name: "{{ name_rpfx }}"
+      register: output
+
+    - name: Assert the route facts
+      ansible.builtin.assert:
+        that:
+          - output.routes[0].address_prefix == "10.1.0.0/24"
+          - output.routes[0].next_hop_type == "VirtualNetworkGateway"
+
+    - name: Get facts of the table
+      azure.azcollection.azure_rm_routetable_info:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-routetable"
+      register: output
+
+    - name: Assert the route table facts
+      ansible.builtin.assert:
+        that:
+          - "output.route_tables | length == 1"
+          - "output.route_tables[0].routes | length == 1"
+          - output.route_tables[0].routes[0].address_prefix == '10.1.0.0/24'
+
+    - name: Delete route (check mode)
+      azure.azcollection.azure_rm_route:
+        name: "{{ route_name }}"
+        resource_group: "{{ resource_group }}-routetable"
+        route_table_name: "{{ name_rpfx }}"
+        state: absent
+      check_mode: true
+
+    - name: Delete route
+      azure.azcollection.azure_rm_route:
+        name: "{{ route_name }}"
+        resource_group: "{{ resource_group }}-routetable"
+        state: absent
+        route_table_name: "{{ name_rpfx }}"
+      register: output
+
+    - name: Assert the route deleted
+      ansible.builtin.assert:
+        that:
+          - output is changed
+
+    - name: Delete route (idempotent)
+      azure.azcollection.azure_rm_route:
+        name: "{{ route_name }}"
+        resource_group: "{{ resource_group }}-routetable"
+        state: absent
+        route_table_name: "{{ name_rpfx }}"
+      register: output
+
+    - name: Assert idempotent
+      ansible.builtin.assert:
+        that:
+          - output is not changed
+
+    - name: Delete route table (check mode)
+      azure.azcollection.azure_rm_routetable:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-routetable"
+        state: absent
+      check_mode: true
+
+    - name: Delete route table
+      azure.azcollection.azure_rm_routetable:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-routetable"
+        state: absent
+      register: output
+
+    - name: Assert the route table deleted
+      ansible.builtin.assert:
+        that:
+          - output is changed
+
+    - name: Delete route table (idempotent)
+      azure.azcollection.azure_rm_routetable:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-routetable"
+        state: absent
+      register: output
+
+    - name: Assert idempotent
+      ansible.builtin.assert:
+        that:
+          - output is not changed
+  always:
+    - name: Force delete the resource group
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ resource_group }}-routetable"
+        force_delete_nonempty: true
+        state: absent

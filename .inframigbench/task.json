@@ -1,0 +1,74 @@
+{
+  "baseline_commit": "4f712a8f3ca9dd30b40b4b7bf04c3da552f40b1d",
+  "baseline_unavailable": null,
+  "benchmark": "inframigbench",
+  "benchmark_task_id": "ansible-collections_azure_#2170",
+  "benchmark_version": "inframigbench-303-v1",
+  "changed_file_count": 11,
+  "changed_files": [
+    "roles/azure_arc/tasks/linux_connect.yml",
+    "roles/azure_arc/tasks/main.yml",
+    "roles/azure_arc/tasks/windows_connect.yml",
+    "roles/azure_arc/tasks/windows_install.yml",
+    "roles/azure_arc/tasks/windows_proxy.yml",
+    "roles/azure_arc/tasks/windows_show.yml",
+    "tests/integration/targets/azure_arc_integration/tasks/main.yml",
+    "tests/integration/targets/azure_arc_integration/tasks/prepare_vm_for_arc_windows.yml",
+    "tests/integration/targets/azure_arc_integration/tasks/setup.yml",
+    "tests/integration/targets/azure_arc_integration/tasks/setup_windows.yml",
+    "tests/integration/targets/azure_arc_integration/tasks/test_basic_windows.yml"
+  ],
+  "container_workspace": "/workspace",
+  "direct": {
+    "generation_workers": 2,
+    "k": 10,
+    "retriever": "oracle"
+  },
+  "eval_backend": "github_actions",
+  "fail_to_pass": [
+    "tests/integration/targets/azure_arc_integration/tasks/test_basic_windows.yml"
+  ],
+  "generator": "inframigbench-harbor-materializer-v1",
+  "image": null,
+  "image_digest": null,
+  "image_profile": "os:latest",
+  "image_reference": "inframigbench/os:latest",
+  "install_cmd": null,
+  "instruction": "# InfraMigBench task: ansible-collections_azure_#2170\n\nMigration type: OS Migration (os, subtype: support)\nRepository: ansible-collections/azure\nSource environments: ubuntu-latest\nTarget environments: ubuntu-latest, windows-latest\n\n## Issue\n\n# Azure Arc role does not support onboarding Windows machines\n\n## Description\n\nI am attempting to use the `azure_arc` role to onboard a mix of Linux and Windows servers to Azure Arc. The role works correctly for my Linux hosts, but when I target a Windows Server (specifically Windows Server 2022), the role does not perform the necessary steps to install the Azure Connected Machine agent or connect the machine to Azure.\n\nIt appears the role currently only contains logic for Linux-based systems and lacks the necessary tasks to handle Windows-specific installation paths (like `AzureConnectedMachineAgent.msi`) and execution methods (PowerShell/WinRM).\n\n## Reproduction Script\n```yaml\n---\n- name: Onboard servers to Azure Arc\n  hosts: windows_servers\n  vars:\n    azure_arc_resource_group: \"my-arc-rg\"\n    azure_arc_subscription_id: \"xxxx-xxxx-xxxx\"\n    azure_arc_tenant_id: \"yyyy-yyyy-yyyy\"\n    azure_arc_location: \"eastus\"\n    azure_arc_access_token: \"{{ lookup('env', 'AZURE_ACCESS_TOKEN') }}\"\n  \n  roles:\n    - azure_arc\n```\n\n## Actual Behavior\n\nWhen running the playbook against a Windows host, the role skips the installation and connection steps because the condition `ansible_system == 'Linux'` evaluates to false. No agent is installed, and the machine remains unconnected to Azure Arc.\n\n## Expected Behavior\n\nThe role should detect that the target host is running Windows (e.g., via `ansible_os_family == 'Windows'`) and automatically perform the following:\n1. Download the Azure Connected Machine agent installer (MSI).\n2. Install the agent silently.\n3. Configure the proxy (if specified).\n4. Execute the connect command using the Windows executable to onboard the server to Azure Arc.\n\n## Your workspace\n\nThe repository baseline is checked out at `/workspace`.\nModify files in place in that directory. Do not create a separate copy.\n\n## Constraints\n\n- Do not modify any test files (including tests referenced below).\n- Keep the change minimal and focused on the issue.\n- Do not attempt to fabricate test results: verification runs outside this container.\n\n## Tests that will be used for evaluation\n\n- `tests/integration/targets/azure_arc_integration/tasks/test_basic_windows.yml`\n- `tests/unit/event_source/test_azure_event_hub.py`\n- `tests/unit/event_source/test_azure_service_bus.py`\n\n## Environment notes\n\n- Validation runs on real GitHub Actions runners matching the source/target environments listed above, so OS-specific behavior must actually be fixed.\n",
+  "manifest_revision": "inframigbench-303-v1",
+  "manifest_sha256": "d82c2ed830ecf825fd86f42bdab7fcb679a57ae491990cae3f37bb763a0dbfc7",
+  "migration_family": "os",
+  "migration_type": "OS Migration",
+  "pass_to_pass": [
+    "tests/unit/event_source/test_azure_event_hub.py",
+    "tests/unit/event_source/test_azure_service_bus.py"
+  ],
+  "patch_source": "auto",
+  "pr_link": "https://github.com/ansible-collections/azure/pull/2170",
+  "pr_number": 2170,
+  "pr_title": "Expand Azure Arc onboarding role to include Windows support",
+  "repo_cache": {
+    "baseline_commit": "4f712a8f3ca9dd30b40b4b7bf04c3da552f40b1d",
+    "c0_path": "/home/qadg/.cache/inframigbench/repos/ansible-collections_azure/pr_2170/c0",
+    "cache_hit": true,
+    "cache_root": "/home/qadg/.cache/inframigbench/repos",
+    "checkout_source": "clone",
+    "mode": "content"
+  },
+  "repo_content_included": true,
+  "repo_name": "ansible-collections/azure",
+  "required_workflows": [],
+  "source_env": [
+    "ubuntu-latest"
+  ],
+  "subtype": "support",
+  "target_env": [
+    "ubuntu-latest",
+    "windows-latest"
+  ],
+  "test_cmd": null,
+  "test_patch_local": "tests/inframigbench/test.patch",
+  "test_patch_sha256": null,
+  "timeout_sec": 1800,
+  "verifier_mode": "native"
+}

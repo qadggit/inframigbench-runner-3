@@ -1,0 +1,153 @@
+- name: Create a new resource group for workspace test
+  azure.azcollection.azure_rm_resourcegroup:
+    name: "{{ resource_group }}-workspace"
+    location: eastus
+
+- name: For workspace test
+  block:
+    - name: Prepare random number
+      ansible.builtin.set_fact:
+        name_rpfx: "workspace{{ resource_group | hash('md5') | truncate(7, True, '') }}{{ 1000 | random }}"
+
+    - name: Create workspace (check mode)
+      azure.azcollection.azure_rm_loganalyticsworkspace:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-workspace"
+        retention_in_days: 40
+      check_mode: true
+      register: output
+
+    - name: Assert the workspace check mode
+      ansible.builtin.assert:
+        that:
+          - output is changed
+
+    - name: Get workspace
+      azure.azcollection.azure_rm_loganalyticsworkspace_info:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-workspace"
+      register: facts
+
+    - name: Assert the workspace facts
+      ansible.builtin.assert:
+        that:
+          - facts.workspaces | length == 0
+
+    - name: Create workspace
+      azure.azcollection.azure_rm_loganalyticsworkspace:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-workspace"
+        retention_in_days: 40
+      register: output
+
+    - name: Assert the workspace created
+      ansible.builtin.assert:
+        that:
+          - output.retention_in_days == 40
+          - output is changed
+          - output.intelligence_packs | length > 0
+
+    - name: Create workspace (idempotent)
+      azure.azcollection.azure_rm_loganalyticsworkspace:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-workspace"
+        retention_in_days: 40
+      register: output
+
+    - name: Assert idempotent
+      ansible.builtin.assert:
+        that:
+          - output is not changed
+
+    - name: Get workspace
+      azure.azcollection.azure_rm_loganalyticsworkspace_info:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-workspace"
+      register: facts
+
+    - name: Assert the loganalytics workspace facts
+      ansible.builtin.assert:
+        that:
+          - facts.workspaces | length == 1
+          - facts.workspaces[0].id == output.id
+
+    - name: Set parameters
+      ansible.builtin.set_fact:
+        pack: "{{ pack | default({}) | combine({output.intelligence_packs[0].name: not output.intelligence_packs[0].enabled}) }}"
+
+    - name: Update intelligence pack
+      azure.azcollection.azure_rm_loganalyticsworkspace:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-workspace"
+        intelligence_packs: "{{ pack }}"
+      register: intelligence
+
+    - name: Assert the loganalytics workspace updated
+      ansible.builtin.assert:
+        that:
+          - intelligence.intelligence_packs[0].enabled != output.intelligence_packs[0].enabled
+
+    - name: Remove workspace (check mode)
+      azure.azcollection.azure_rm_loganalyticsworkspace:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-workspace"
+        state: absent
+      check_mode: true
+      register: output
+
+    - name: Assert the loganalytics workspace check mode
+      ansible.builtin.assert:
+        that:
+          - output is changed
+
+    - name: Get workspace
+      azure.azcollection.azure_rm_loganalyticsworkspace_info:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-workspace"
+      register: facts
+
+    - name: Assert the loganalystics workspace facts
+      ansible.builtin.assert:
+        that:
+          - facts.workspaces | length == 1
+
+    - name: Remove workspace
+      azure.azcollection.azure_rm_loganalyticsworkspace:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-workspace"
+        state: absent
+      register: output
+
+    - name: Assert the loganalytics workspace deleted
+      ansible.builtin.assert:
+        that:
+          - output is changed
+
+    - name: Get workspace
+      azure.azcollection.azure_rm_loganalyticsworkspace_info:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-workspace"
+      register: facts
+
+    - name: Assert the loganalystics workspace facts
+      ansible.builtin.assert:
+        that:
+          - facts.workspaces | length == 0
+
+    - name: Remove workspace (idempontent)
+      azure.azcollection.azure_rm_loganalyticsworkspace:
+        name: "{{ name_rpfx }}"
+        resource_group: "{{ resource_group }}-workspace"
+        state: absent
+      register: output
+
+    - name: Assert the loganalystics workspace deleted
+      ansible.builtin.assert:
+        that:
+          - output is not changed
+  always:
+    - name: Force delete the resource group
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ resource_group }}-workspace"
+        force_delete_nonempty: true
+        state: absent

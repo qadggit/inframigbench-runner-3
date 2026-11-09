@@ -1,0 +1,20 @@
+---
+- name: Config hosts
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Set facts
+      ansible.builtin.include_vars: vars.yml
+
+    - name: Refresh inventory
+      ansible.builtin.meta: refresh_inventory
+
+    - name: Test Inventory
+      ansible.builtin.assert:
+        that:
+          - vm_name in hostvars
+          - hostvars[vm_name].hyper_v_generation is defined
+          - hostvars[vm_name].os_name is defined
+          - hostvars[vm_name].os_version is defined
+          - hostvars[vm_name].computer_name is defined

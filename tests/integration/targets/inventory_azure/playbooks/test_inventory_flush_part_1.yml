@@ -1,0 +1,34 @@
+---
+- name: Config hosts
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Set facts
+      ansible.builtin.include_vars: vars.yml
+
+    - name: Inventory powerstate is stopped
+      ansible.builtin.assert:
+        that:
+          - vm_name_2 in hostvars
+          - hostvars[vm_name_2].powerstate == "stopped"
+
+    - name: Show the VM powerstate for the first time
+      ansible.builtin.debug:
+        var: hostvars[vm_name_2].powerstate
+
+    - name: Power on minimal VM 2
+      azure.azcollection.azure_rm_virtualmachine:
+        resource_group: "{{ resource_group }}-inventory"
+        name: "{{ vm_name_2 }}"
+        started: true
+
+    - name: Inventory powerstate is still stopped
+      ansible.builtin.assert:
+        that:
+          - vm_name_2 in hostvars
+          - hostvars[vm_name_2].powerstate == "stopped"
+
+    - name: Show the VM powerstate for the secondary time
+      ansible.builtin.debug:
+        var: hostvars[vm_name_2].powerstate

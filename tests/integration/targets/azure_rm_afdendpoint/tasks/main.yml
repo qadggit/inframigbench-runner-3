@@ -1,0 +1,181 @@
+- name: Create a new resource group for Azure Front Door endpoint test
+  azure.azcollection.azure_rm_resourcegroup:
+    name: "{{ resource_group }}-afdendpoint"
+    location: eastus
+
+- name: For Azure Front Door endpoint test
+  block:
+    - name: Prepare random name for Profile & EndPoint
+      ansible.builtin.set_fact:
+        profile: "prof-{{ resource_group | hash('md5') | truncate(4, True, '') }}{{ 100000 | random }}"
+        endpoint: "endpoint-{{ resource_group | hash('md5') | truncate(4, True, '') }}{{ 100000 | random }}"
+
+    - name: Create Standard Frontdoor Profile
+      azure.azcollection.azure_rm_cdnprofile:
+        name: "{{ profile }}"
+        location: "Global"
+        resource_group: "{{ resource_group }}-afdendpoint"
+        sku: "standard_azurefrontdoor"
+        state: "present"
+
+    - name: Create EndPoint
+      azure.azcollection.azure_rm_afdendpoint:
+        name: "{{ endpoint }}"
+        profile_name: "{{ profile }}"
+        resource_group: "{{ resource_group }}-afdendpoint"
+        enabled_state: "Enabled"
+        auto_generated_domain_name_label_scope: "TenantReuse"
+        tags:
+          test: "tag value"
+        state: "present"
+      register: output
+
+    - name: Assert the resource was created and returns expected variables
+      ansible.builtin.assert:
+        that:
+          - output is changed
+          - output.id is defined
+          - output.host_name is defined
+
+    - name: Update EndPoint (idempotent test)
+      azure.azcollection.azure_rm_afdendpoint:
+        name: "{{ endpoint }}"
+        profile_name: "{{ profile }}"
+        resource_group: "{{ resource_group }}-afdendpoint"
+        enabled_state: "Enabled"
+        auto_generated_domain_name_label_scope: "TenantReuse"
+        tags:
+          test: "tag value"
+        state: "present"
+      register: output
+
+    - name: Assert the resource has not changed
+      ansible.builtin.assert:
+        that:
+          - output is not changed
+
+    - name: Load Endpoint info
+      azure.azcollection.azure_rm_afdendpoint_info:
+        name: "{{ endpoint }}"
+        profile_name: "{{ profile }}"
+        resource_group: "{{ resource_group }}-afdendpoint"
+      register: output
+
+    - name: Assert the resource has the proper values set
+      ansible.builtin.assert:
+        that:
+          - output.afdendpoints | length == 1
+          - output.afdendpoints[0].auto_generated_domain_name_label_scope == 'TenantReuse'
+          - output.afdendpoints[0].enabled_state == 'Enabled'
+          - output.afdendpoints[0].host_name is defined
+          - output.afdendpoints[0].id is defined
+          - output.afdendpoints[0].profile_name == profile
+          - output.afdendpoints[0].tags.test == 'tag value'
+          - output is not changed
+
+    - name: Update EndPoint (with different values)
+      azure.azcollection.azure_rm_afdendpoint:
+        name: "{{ endpoint }}"
+        profile_name: "{{ profile }}"
+        resource_group: "{{ resource_group }}-afdendpoint"
+        enabled_state: "Disabled"
+        tags:
+          test: "new tag value"
+          newtag: "another value"
+        state: "present"
+      register: output
+
+    - name: Assert the resource has changed
+      ansible.builtin.assert:
+        that:
+          - output is changed
+
+    - name: Update EndPoint (idempotent test)
+      azure.azcollection.azure_rm_afdendpoint:
+        name: "{{ endpoint }}"
+        profile_name: "{{ profile }}"
+        resource_group: "{{ resource_group }}-afdendpoint"
+        enabled_state: "Disabled"
+        tags:
+          test: "new tag value"
+          newtag: "another value"
+        state: "present"
+      register: output
+
+    - name: Assert the resource has not changed
+      ansible.builtin.assert:
+        that:
+          - output is not changed
+
+    - name: Update EndPoint (replace tags)
+      azure.azcollection.azure_rm_afdendpoint:
+        name: "{{ endpoint }}"
+        profile_name: "{{ profile }}"
+        resource_group: "{{ resource_group }}-afdendpoint"
+        enabled_state: "Disabled"
+        append_tags: false
+        tags:
+          test2: "a tag value"
+        state: "present"
+      register: output
+
+    - name: Assert the resource has changed
+      ansible.builtin.assert:
+        that:
+          - output is changed
+
+    - name: Load Endpoint info
+      azure.azcollection.azure_rm_afdendpoint_info:
+        name: "{{ endpoint }}"
+        profile_name: "{{ profile }}"
+        resource_group: "{{ resource_group }}-afdendpoint"
+      register: output
+
+    - name: Assert the resource has the proper values set and is missing the previous tag
+      ansible.builtin.assert:
+        that:
+          - output.afdendpoints | length == 1
+          - output.afdendpoints[0].auto_generated_domain_name_label_scope == 'TenantReuse'
+          - output.afdendpoints[0].enabled_state == 'Disabled'
+          - output.afdendpoints[0].tags['test2'] == 'a tag value'
+          - output.afdendpoints[0].tags['newtag'] is not defined
+          - output is not changed
+
+    - name: Delete EndPoint
+      azure.azcollection.azure_rm_afdendpoint:
+        name: "{{ endpoint }}"
+        profile_name: "{{ profile }}"
+        resource_group: "{{ resource_group }}-afdendpoint"
+        state: "absent"
+      register: output
+
+    - name: Assert the resource was deleted
+      ansible.builtin.assert:
+        that:
+          - output is changed
+
+    - name: Delete EndPoint (idempotent test)
+      azure.azcollection.azure_rm_afdendpoint:
+        name: "{{ endpoint }}"
+        profile_name: "{{ profile }}"
+        resource_group: "{{ resource_group }}-afdendpoint"
+        state: "absent"
+      register: output
+
+    - name: Assert the delete function is idempotent
+      ansible.builtin.assert:
+        that:
+          - output is not changed
+
+    - name: Delete Frontdoor Profile
+      azure.azcollection.azure_rm_cdnprofile:
+        name: "{{ profile }}"
+        location: "Global"
+        resource_group: "{{ resource_group }}-afdendpoint"
+        state: "absent"
+  always:
+    - name: Force delete the resource group
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ resource_group }}-afdendpoint"
+        force_delete_nonempty: true
+        state: absent

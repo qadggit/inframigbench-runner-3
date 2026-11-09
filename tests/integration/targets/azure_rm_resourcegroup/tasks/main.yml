@@ -1,0 +1,68 @@
+- name: Create a new resource group for resource group test
+  azure.azcollection.azure_rm_resourcegroup:
+    name: "{{ resource_group }}-resource"
+    location: eastus
+
+- name: For resoruce group test
+  block:
+    - name: Get resource group datalake info
+      azure.azcollection.azure_rm_resourcegroup_info:
+        name: "{{ resource_group }}-resource"
+        list_resources: true
+      register: rg
+
+    - name: Assert the resource group facts
+      ansible.builtin.assert:
+        that:
+          - rg.resourcegroups | length == 1
+          - rg.resourcegroups[0].resources | length >= 0
+
+    - name: Get resource group info
+      azure.azcollection.azure_rm_resourcegroup_info:
+      register: rg
+
+    - name: Assert all resource group facts
+      ansible.builtin.assert:
+        that:
+          - rg.resourcegroups | length >= 1
+
+    - name: Get resource group info
+      azure.azcollection.azure_rm_resourcegroup_info:
+        name: "{{ resource_group }}-resource"
+        list_resources: true
+      register: rg
+
+    - name: Assert the resource group facts
+      ansible.builtin.assert:
+        that:
+          - rg.resourcegroups | length == 1
+          - rg.resourcegroups[0].resources | length >= 0
+
+    - name: Create resource group (idempontent)
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ resource_group }}-resource"
+        location: "{{ rg.resourcegroups[0].location }}"
+      register: output
+
+    - name: Assert idempotent
+      ansible.builtin.assert:
+        that:
+          - output is not changed
+
+    - name: Delete resource group
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ resource_group }}-resource"
+        state: absent
+      check_mode: true
+      register: output
+
+    - name: Assert the resource group deleted
+      ansible.builtin.assert:
+        that:
+          - output is changed
+  always:
+    - name: Force delete the resource group
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ resource_group }}-resource"
+        force_delete_nonempty: true
+        state: absent
