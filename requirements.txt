@@ -56,7 +56,7 @@ azure-mgmt-web==7.3.1
 azure-mgmt-eventgrid==10.4.0
 azure-ai-ml==1.31.0
 azure-nspkg==3.0.2
-azure-servicebus==7.14.2
+azure-servicebus==7.15.0
 azure-storage-blob==12.23.0b1
 azure-storage-file-share==12.24.0
 msgraph-sdk==1.6.0
