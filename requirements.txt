@@ -61,7 +61,7 @@ azure-storage-blob==12.23.0b1
 azure-storage-file-share==12.24.0
 msgraph-sdk==1.6.0
 netaddr>=1.3.0
-oras>=0.2.38
+oras>=0.2.43
 packaging>=25.0
 pandas>=2.3.3
 requests>=2.32.5
